@@ -187,8 +187,3 @@ dmypy.json
 # Visual Studio Code Files
 .vscode
 
-# submodule
-third_party/onnx
-third_party/benchmark
-third_party/mlir-hlo
-third_party/rapidcheck
