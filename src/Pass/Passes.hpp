@@ -28,6 +28,7 @@ std::unique_ptr<mlir::Pass> createONNXOpTransformPass(
     int threshold, bool report);
 
 /// Pass for ONNX graph level op schedule
+std::unique_ptr<mlir::Pass> createConvSplitPass();
 std::unique_ptr<mlir::Pass> createCountOpNumPass();
 std::unique_ptr<mlir::Pass> createOpSchedulePass();
 

@@ -1,5 +1,6 @@
 #include "src/CostModel/Task.hpp"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "src/CostModel/Utils.hpp"
 #include "llvm/ADT/StringRef.h"
 
 namespace onnx_mlir {
@@ -7,7 +8,7 @@ namespace onnx_mlir {
 ComputeTask::ComputeTask(mlir::Operation *op)
     : BaseTask(TASK_STATE::WAIT), op_(op) {
   assert(op != nullptr);
-  
+
   remain_time_ = onnx_mlir::GetOpCost(op).execution_time;
 }
 
@@ -26,10 +27,9 @@ bool ComputeTask::IsReady(
 
   for (const auto &operand : op_->getOperands()) {
 
-    // Ignore ConstOp and NoneOp
+    // Ignore ConstOp and NoneOp and SliceOp
     auto operand_op = operand.getDefiningOp();
-    if (!operand_op || isa<ONNXConstantOp>(operand_op) ||
-        isa<ONNXNoneOp>(operand_op)) {
+    if (!operand_op || ShouldIgnoreOperandOp(operand_op)) {
       continue;
     }
 

@@ -115,7 +115,7 @@ OpCost GetONNXConv2DOpCost(mlir::Operation *conv_opr, const Device &device) {
   // [Co, Ci, Hk, Wk]
   auto kernel_shape = kernel_type.getShape();
 
-  int64_t op_count = output_type.getNumElements() * kernel_shape[0] *
+  int64_t op_count = output_type.getNumElements() * kernel_shape[1] *
                      kernel_shape[2] * kernel_shape[3] * 2;
 
   // MFLOPS
@@ -329,7 +329,7 @@ OpCost GetOpCost(mlir::Operation *op) {
       CASE_OP(GetONNXGemmOpCost, ONNXGemmOp) \
       CASE_OP(GetONNXMatmulOpCost, ONNXMatMulOp) \
       CASE_OP(GetONNXReduceOpCost, ONNXReduceSumOp, ONNXReduceMeanOp, ONNXReduceMaxOp, ONNXReduceMinOp, ONNXReduceSumV11Op) \
-      CASE_OP(GetONNXIdentityOpCost, ONNXFlattenOp, ONNXReshapeOp) \
+      CASE_OP(GetONNXIdentityOpCost, ONNXFlattenOp, ONNXReshapeOp, ONNXSliceOp, ONNXConcatOp) \
       CASE_OP(GetONNXPoolOpCost, ONNXMaxPoolSingleOutOp, ONNXMaxPoolOp, ONNXAveragePoolOp) \
       CASE_OP(GetONNXTranscendentalOpCost, ONNXReluOp)
       .Default([&](mlir::Operation* op){

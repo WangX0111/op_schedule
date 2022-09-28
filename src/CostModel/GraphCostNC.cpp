@@ -1,4 +1,5 @@
 #include "src/CostModel/GraphCostNC.hpp"
+#include "src/CostModel/Utils.hpp"
 
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Types.h"
@@ -33,14 +34,9 @@ std::vector<Operation *> TopoSortByPriority(std::vector<Operation *> ops) {
   std::deque<mlir::Operation *> worklist;
   std::unordered_map<mlir::Operation *, bool> visited;
   for (auto op : ops) {
-    if (isa<ONNXConstantOp>(op) || isa<ONNXNoneOp>(op) ||
-        isa<ONNXReturnOp>(op) || isa<func::ReturnOp>(op)) {
-      continue;
-    }
     for (const auto &operand : op->getOperands()) {
       auto operand_op = operand.getDefiningOp();
-      if (!operand_op || isa<ONNXConstantOp>(operand_op) ||
-          isa<ONNXNoneOp>(operand_op)) {
+      if (!operand_op || ShouldIgnoreOperandOp(operand_op)) {
         continue;
       }
       indegree[op]++;
@@ -110,10 +106,10 @@ void GraphCostNC::GenDeviceTaskList(
   for (auto op : sorted_ops) {
 
     // ignore op
-    if (isa<ONNXConstantOp>(op) || isa<ONNXNoneOp>(op) ||
-        isa<ONNXReturnOp>(op) || isa<func::ReturnOp>(op)) {
-      continue;
-    }
+    // if (isa<ONNXConstantOp>(op) || isa<ONNXNoneOp>(op) ||
+    //     isa<ONNXReturnOp>(op) || isa<func::ReturnOp>(op)) {
+    //   continue;
+    // }
 
     std::string compute_device_id =
         op->getAttr("device").cast<mlir::StringAttr>().data();
@@ -121,7 +117,7 @@ void GraphCostNC::GenDeviceTaskList(
     for (const auto &operand : op->getOperands()) {
       auto produce_op = operand.getDefiningOp();
       if (!produce_op || isa<ONNXConstantOp>(produce_op) ||
-          isa<ONNXNoneOp>(produce_op)) {
+          isa<ONNXNoneOp>(produce_op) || isa<ONNXSliceOp>(produce_op)) {
         continue;
       }
       if (!device_memory[compute_device_id].contains(operand)) {
@@ -472,9 +468,9 @@ Cost GraphCostNC::GetGraphCost() {
     // std::cout << "=======device transfer_task===========\n";
     // PrintMapContainer(device_transfer_task);
     // std::cout << "===================================\n";
-    // // std::cout << "======== Transfer cnt =========\n";
-    // // PrintMapValue(transfer_cnt);
-    // // std::cout << "===============================\n";
+    // std::cout << "======== Transfer cnt =========\n";
+    // PrintMapValue(transfer_cnt);
+    // std::cout << "===============================\n";
     // std::cout << "***************************************************\n";
     // for debug end
   }

@@ -9,6 +9,8 @@
 
 #include "llvm/Support/raw_ostream.h"
 
+#include "ga/ga.h"
+
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
@@ -187,8 +189,8 @@ void RandomSearchSchedule(mlir::OpBuilder &builder,
       GetOpScheduleAttr(ops, op_device_table, op_priority_table);
       min_latency = latency;
     }
-    // std::cout << "iter num: " << i << " latency: " << latency
-    //           << " min_latency: " << min_latency << "\n";
+    std::cout << "iter num: " << i << " latency: " << latency
+              << " min_latency: " << min_latency << "\n";
   }
   for (auto op : ops) {
     op->setAttr(DEVICE_ATTR, builder.getStringAttr(op_device_table[op]));
@@ -196,15 +198,15 @@ void RandomSearchSchedule(mlir::OpBuilder &builder,
   }
 }
 
-void SetScheduleAttrByChromo(mlir::OpBuilder &builder,
-    std::vector<mlir::Operation *> &ops, const std::vector<double> &chromo,
+void SetScheduleAttrByFeatures(mlir::OpBuilder &builder,
+    std::vector<mlir::Operation *> &ops, const std::vector<double> &features,
     const std::vector<Device> &device_list) {
   int64_t n_device = device_list.size();
   int64_t n_ops = ops.size();
 
   for (int64_t op_idx = 0; op_idx < n_ops; ++op_idx) {
     int64_t device_affine_range_begin = op_idx * n_device;
-    int64_t max_affine_device_idx = ArgMaxRange(chromo,
+    int64_t max_affine_device_idx = ArgMaxRange(features,
         device_affine_range_begin, device_affine_range_begin + n_device - 1);
     Device device =
         device_list[max_affine_device_idx - device_affine_range_begin];
@@ -212,7 +214,7 @@ void SetScheduleAttrByChromo(mlir::OpBuilder &builder,
     op->setAttr(DEVICE_ATTR, builder.getStringAttr(device.id()));
 
     int64_t op_priority_idx = n_ops * n_device + op_idx;
-    auto priority = chromo[op_priority_idx];
+    auto priority = features[op_priority_idx];
     op->setAttr(PRIORITY_ATTR, builder.getF32FloatAttr(priority));
   }
 }
@@ -224,14 +226,42 @@ void GASchedule(mlir::OpBuilder &builder, std::vector<Operation *> &ops,
   for (const auto &device : device_set) {
     device_list.push_back(device);
   }
-  int64_t n_device = device_list.size(), n_ops = ops.size();
-  int64_t chromo_len = n_device * n_ops + n_ops;
 
-  // device affine + priority
-  auto init_chromo = GenRandomVec(chromo_len);
+  GraphCostNC graph_cost(ops, device_set);
+  auto cost_func = [&](const std::vector<double> &features) {
+    SetScheduleAttrByFeatures(builder, ops, features, device_list);
+    graph_cost.UpdateOps(ops);
+    auto latency = graph_cost.GetGraphCost().time_cost;
+    return latency;
+  };
 
-  SetScheduleAttrByChromo(builder, ops, init_chromo, device_list);
+  int64_t n_ops = ops.size();
+  int64_t n_device = device_list.size();
 
+  int64_t n_features = n_ops * n_device + n_ops;
+  int64_t size_pop = 50;
+  int64_t max_iter = iter_num;
+  double prob_mut = 0.01;
+  double remain_rate = 0.5;
+  std::vector<double> lower_bound(n_features, 0);
+  std::vector<double> upper_bound(n_features, 1);
+  bool early_stop = true;
+  double seg_len = 12;
+
+  // cc_opt::GA<decltype(cost_func)> ga(cost_func, n_features, size_pop,
+  // max_iter,
+  //                                    prob_mut, remain_rate, lower_bound,
+  //                                    upper_bound, early_stop, seg_len);
+
+  cc_opt::FloatGA<decltype(cost_func)> ga(cost_func, n_features, size_pop,
+      max_iter, prob_mut, remain_rate, lower_bound, upper_bound, early_stop);
+
+  ga.Run();
+
+  auto best_feature = ga.GetBestFeature();
+  SetScheduleAttrByFeatures(builder, ops, best_feature, device_list);
+
+  std::cout << "best :" << ga.GetBestCost() << "\n";
 }
 
 } // namespace onnx_mlir

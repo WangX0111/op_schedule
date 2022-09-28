@@ -15,6 +15,7 @@
 #include "src/Pass/Passes.hpp"
 #include "src/Transform/ONNX/OpScheduler.hpp"
 #include "src/Utils/Utils.hpp"
+#include "src/Log/Log.hpp"
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
@@ -29,7 +30,7 @@ namespace onnx_mlir {
 
 bool IgnoreOp(mlir::Operation *op) {
   if (isa<ONNXReturnOp>(op) || isa<ONNXConstantOp>(op) ||
-      isa<func::ReturnOp>(op) || isa<ONNXNoneOp>(op) || isa<ONNXReturnOp>(op)) {
+      isa<func::ReturnOp>(op) || isa<ONNXNoneOp>(op) || isa<ONNXReturnOp>(op) || isa<ONNXSliceOp>(op)) {
     return true;
   }
   return false;
@@ -72,6 +73,12 @@ public:
 
     std::cout << "time_cost:  " << cost.time_cost << "\n";
     std::cout << "memory_peak:  " << cost.memory_peak << "\n";
+
+    std::cout << "Not Support Op Level CostModel: \n";
+    for (const auto &str : NotSupportCostOp) {
+      std::cout << str << " ";
+    }
+    std::cout << "\n";
   }
 
 private:
@@ -83,7 +90,7 @@ private:
     // HackSchedule(builder, ops, device_set);
     // SingleDTUSchedule(builder, ops, device_set);
     // SingleCPUSchedule(builder, ops, device_set);
-    // RandomSearchSchedule(builder, ops, device_set, 500);
+    // RandomSearchSchedule(builder, ops, device_set, 100);
     GASchedule(builder, ops, device_set, 500);
   }
 };

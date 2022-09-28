@@ -2,7 +2,6 @@
 #define ONNX_MLIR_DEVICE_HPP
 
 #include "llvm/ADT/SmallSet.h"
-#include <bits/floatn-common.h>
 #include <string>
 #include <unordered_map>
 

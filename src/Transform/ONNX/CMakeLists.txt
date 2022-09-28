@@ -98,3 +98,14 @@ add_onnx_mlir_library(OMOpSchedule
   MLIRFuncDialect
   MLIRPass
 )
+
+add_onnx_mlir_library(OMConvSplit
+  ConvSplitPass.cpp
+
+  LINK_LIBS PUBLIC
+  OMONNXOps
+  OMCost
+  OMLog
+  MLIRFuncDialect
+  MLIRPass
+)

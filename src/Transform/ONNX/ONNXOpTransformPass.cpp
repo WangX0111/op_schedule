@@ -140,6 +140,7 @@ void ONNXOpTransformPass::runOnOperation() {
     dynamicPM.addPass(onnx_mlir::createShapeInferencePass());
     dynamicPM.addNestedPass<func::FuncOp>(
         onnx_mlir::createConstPropONNXToONNXPass());
+
     if (failed(runPipeline(dynamicPM, module)))
       return signalPassFailure();
     if (failed(createTagForIR(module, &currentTag)))
@@ -158,8 +159,11 @@ void ONNXOpTransformPass::runOnOperation() {
   }
   OpPassManager dynamicPM("builtin.module", OpPassManager::Nesting::Implicit);
   // dynamicPM.addPass(onnx_mlir::createCountOpNumPass());
-  dynamicPM.addPass(onnx_mlir::createOpSchedulePass());
+  dynamicPM.addPass(onnx_mlir::createConvSplitPass());
+  dynamicPM.addPass(onnx_mlir::createShapeInferencePass());
   dynamicPM.addPass(onnx_mlir::createElideConstantValuePass());
+  dynamicPM.addPass(onnx_mlir::createOpSchedulePass());
+
   if (failed(runPipeline(dynamicPM, module)))
     return signalPassFailure();
   if (failed(createTagForIR(module, &currentTag)))
