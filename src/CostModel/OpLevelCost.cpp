@@ -309,6 +309,18 @@ OpCost GetONNXTranscendentalOpCost(mlir::Operation* op, const Device& device){
 
 }
 
+OpCost GetONNXPureMemoryOp(mlir::Operation* op, const Device& device){
+  // MB
+  double input_io_mb = GetInputBytes(op) / kToMScale;
+  double output_io_mb = GetResultBytes(op) / kToMScale;
+
+  auto device_info = GetDeviceInfo(device);
+
+  auto op_cost = PredictOperationCountBasedCost(0, input_io_mb,
+      output_io_mb, device_info.compute_power_1d, device_info.bandwidth);
+  return op_cost;
+}
+
 OpCost GetOpCost(mlir::Operation *op) {
 
   const auto &device_table = GetDeviceTable();
@@ -329,7 +341,8 @@ OpCost GetOpCost(mlir::Operation *op) {
       CASE_OP(GetONNXGemmOpCost, ONNXGemmOp) \
       CASE_OP(GetONNXMatmulOpCost, ONNXMatMulOp) \
       CASE_OP(GetONNXReduceOpCost, ONNXReduceSumOp, ONNXReduceMeanOp, ONNXReduceMaxOp, ONNXReduceMinOp, ONNXReduceSumV11Op) \
-      CASE_OP(GetONNXIdentityOpCost, ONNXFlattenOp, ONNXReshapeOp, ONNXSliceOp, ONNXConcatOp) \
+      CASE_OP(GetONNXIdentityOpCost, ONNXFlattenOp, ONNXReshapeOp, ONNXSliceOp, ONNXSqueezeOp) \
+      CASE_OP(GetONNXPureMemoryOp, ONNXTransposeOp, ONNXConcatOp, ONNXSplitOp, ONNXOneHotOp, ONNXTransposeOp) \
       CASE_OP(GetONNXPoolOpCost, ONNXMaxPoolSingleOutOp, ONNXMaxPoolOp, ONNXAveragePoolOp) \
       CASE_OP(GetONNXTranscendentalOpCost, ONNXReluOp)
       .Default([&](mlir::Operation* op){
