@@ -2623,7 +2623,8 @@ LogicalResult ONNXSqueezeOp::inferShapes(
   OpBuilder builder(getContext());
   llvm::Optional<ArrayAttr> optionalAttr;
 
-  if (isFromNone(axes())) {
+  auto axesConstOp = getONNXConstantOp(axes());
+  if (isFromNone(axes()) || !axesConstOp.valueAttr()) {
     auto axesAttr = getSqueezeOpAxesFromShape(builder, dataType.getShape());
     optionalAttr.emplace(axesAttr);
 
@@ -2641,7 +2642,7 @@ LogicalResult ONNXSqueezeOp::inferShapes(
         getLoc(), mlir::Attribute(), constDenseAttr);
     mlir::Value constRes = constOp.output();
     setOperand(1, constRes);
-  } else if (auto axesConstOp = getONNXConstantOp(axes())) {
+  } else if (axesConstOp) {
     auto axesAttr = createArrayAttrFromConstantOp(builder, axesConstOp);
     optionalAttr.emplace(axesAttr);
   } else {
