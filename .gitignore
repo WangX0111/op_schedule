@@ -187,3 +187,5 @@ dmypy.json
 # Visual Studio Code Files
 .vscode
 
+# debug
+debug.txt

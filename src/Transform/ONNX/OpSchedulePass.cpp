@@ -90,8 +90,11 @@ private:
     // HackSchedule(builder, ops, device_set);
     // SingleDTUSchedule(builder, ops, device_set);
     // SingleCPUSchedule(builder, ops, device_set);
-    // RandomSearchSchedule(builder, ops, device_set, 100);
-    GASchedule(builder, ops, device_set, 500);
+    // RandomSearchSchedule(builder, ops, device_set, 500);
+    // GASchedule(builder, ops, device_set, 500);
+    // PSOSchedule(builder, ops, device_set, 500);
+
+    BRKGASchedule(builder, ops, device_set, 500);
   }
 };
 

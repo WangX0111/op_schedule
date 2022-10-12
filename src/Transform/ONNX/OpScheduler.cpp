@@ -9,7 +9,11 @@
 
 #include "llvm/Support/raw_ostream.h"
 
-#include "ga/ga.h"
+#define PARALLEL
+#include "third_party/cc_opt/ga/brkga.h"
+#undef PARALLEL
+#include "third_party/cc_opt/ga/ga.h"
+#include "third_party/cc_opt/pso/pso.h"
 
 #include <algorithm>
 #include <cassert>
@@ -221,6 +225,7 @@ void SetScheduleAttrByFeatures(mlir::OpBuilder &builder,
 
 void GASchedule(mlir::OpBuilder &builder, std::vector<Operation *> &ops,
     const DeviceSetT &device_set, int32_t iter_num) {
+  std::cout << "Schedule Strategy : GASchedule\n";
 
   std::vector<Device> device_list;
   for (const auto &device : device_set) {
@@ -238,30 +243,107 @@ void GASchedule(mlir::OpBuilder &builder, std::vector<Operation *> &ops,
   int64_t n_ops = ops.size();
   int64_t n_device = device_list.size();
 
-  int64_t n_features = n_ops * n_device + n_ops;
-  int64_t size_pop = 50;
-  int64_t max_iter = iter_num;
-  double prob_mut = 0.01;
-  double remain_rate = 0.5;
-  std::vector<double> lower_bound(n_features, 0);
-  std::vector<double> upper_bound(n_features, 1);
-  bool early_stop = true;
-  double seg_len = 12;
+  cc_opt::ga::FloatGAParam param;
+  param.n_features = n_ops * n_device + n_ops;
+  param.size_pop = 50;
+  param.max_iter = iter_num;
+  param.prob_mut = 0.01;
+  param.remain_rate = 0.5;
+  param.lower_bound = std::vector<double>(param.n_features, 0.0);
+  param.upper_bound = std::vector<double>(param.n_features, 1.0);
+  param.early_stop = true;
+  cc_opt::ga::FloatGA<decltype(cost_func)> float_ga(cost_func, param);
 
-  // cc_opt::GA<decltype(cost_func)> ga(cost_func, n_features, size_pop,
-  // max_iter,
-  //                                    prob_mut, remain_rate, lower_bound,
-  //                                    upper_bound, early_stop, seg_len);
+  float_ga.Run();
 
-  cc_opt::FloatGA<decltype(cost_func)> ga(cost_func, n_features, size_pop,
-      max_iter, prob_mut, remain_rate, lower_bound, upper_bound, early_stop);
-
-  ga.Run();
-
-  auto best_feature = ga.GetBestFeature();
+  auto best_feature = float_ga.GetBestFeature();
   SetScheduleAttrByFeatures(builder, ops, best_feature, device_list);
 
-  std::cout << "best :" << ga.GetBestCost() << "\n";
+  std::cout << "best :" << float_ga.GetBestCost() << "\n";
+}
+
+void BRKGASchedule(mlir::OpBuilder &builder, std::vector<Operation *> &ops,
+    const DeviceSetT &device_set, int32_t iter_num) {
+  std::cout << "Schedule Strategy : BRKGASchedule\n";
+
+  std::vector<Device> device_list;
+  for (const auto &device : device_set) {
+    device_list.push_back(device);
+  }
+
+  GraphCostNC graph_cost(ops, device_set);
+  auto cost_func = [&](const std::vector<double> &features) {
+    SetScheduleAttrByFeatures(builder, ops, features, device_list);
+    graph_cost.UpdateOps(ops);
+    auto latency = graph_cost.GetGraphCost().time_cost;
+    return latency;
+  };
+
+  int64_t n_ops = ops.size();
+  int64_t n_device = device_list.size();
+
+  cc_opt::ga::BRKGAParam param;
+  param.n_features = n_ops * n_device + n_ops;
+  param.size_pop = param.n_features;
+  param.elite_rate = 0.20;
+  param.mutant_rate = 0.20;
+  param.inherit_elite_prob = 0.70;
+
+  param.max_iter = iter_num;
+  param.lower_bound = std::vector<double>(param.n_features, 0);
+  param.upper_bound = std::vector<double>(param.n_features, 1.0);
+
+  cc_opt::ga::BRKGA<decltype(cost_func)> brkga(cost_func, param);
+
+  brkga.Run();
+
+  auto best_feature = brkga.GetBestFeature();
+  SetScheduleAttrByFeatures(builder, ops, best_feature, device_list);
+
+  std::cout << "best :" << brkga.GetBestCost() << "\n";
+}
+
+void PSOSchedule(mlir::OpBuilder &builder, std::vector<Operation *> &ops,
+    const DeviceSetT &device_set, int32_t iter_num) {
+
+  std::cout << "Schedule Strategy : PSOSchedule\n";
+  std::vector<Device> device_list;
+  for (const auto &device : device_set) {
+    device_list.push_back(device);
+  }
+
+  GraphCostNC graph_cost(ops, device_set);
+  auto cost_func = [&](const std::vector<double> &features) {
+    SetScheduleAttrByFeatures(builder, ops, features, device_list);
+    graph_cost.UpdateOps(ops);
+    auto latency = graph_cost.GetGraphCost().time_cost;
+    return latency;
+  };
+
+  int64_t n_ops = ops.size();
+  int64_t n_device = device_list.size();
+
+  int64_t n_features = n_ops * n_device + n_ops;
+
+  cc_opt::pso::PSOParam param;
+  param.n_features = n_features;
+  param.size_pop = 500;
+  param.max_iter = iter_num;
+  param.person_learning_factor = 2;
+  param.group_learning_factor = 2;
+  param.inertia_weight = 0.8;
+  param.time_step = 1;
+  param.lower_bound = std::vector<double>(n_features, 0);
+  param.upper_bound = std::vector<double>(n_features, 1.0);
+  param.early_stop = true;
+
+  cc_opt::pso::PSO<decltype(cost_func)> pso(cost_func, param);
+  pso.Run();
+
+  auto best_feature = pso.GetBestFeature();
+  SetScheduleAttrByFeatures(builder, ops, best_feature, device_list);
+
+  std::cout << "best :" << pso.GetBestCost() << "\n";
 }
 
 } // namespace onnx_mlir
